@@ -1,5 +1,5 @@
 # Dacade Image sharing & Donation on Celo Alfajores
-Dapp URL:
+Dapp URL: https://dacade-donation.netlify.app/
 
 ## Description:
 Upload images to IPFS and get donated in CELO token
