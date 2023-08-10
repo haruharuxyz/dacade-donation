@@ -9,6 +9,10 @@ interface Props {
   closeModal: () => void;
 }
 
+const [loading, setLoading] = useState(false);
+
+const MAX_DESCRIPTION_LENGTH = 100;
+
 export const UploadImage: React.FC<Props> = ({ isOpen, closeModal }) => {
   const [buttonTxt, setButtonTxt] = useState<string>("Upload");
   const [file, setFile] = useState<File | null>(null);
@@ -16,33 +20,51 @@ export const UploadImage: React.FC<Props> = ({ isOpen, closeModal }) => {
   const [description, setDescription] = useState<string>("");
 
   const uploadImage = async () => {
-    setButtonTxt("Uploading to IPFS...");
-    // const added = await client.add(file);
-    let formData = new FormData();
+  if (!file) {
+    console.error("No file selected for upload");
+    return;
+  }
+
+    setLoading(true);
+
+  setButtonTxt("Uploading to IPFS...");
+
+  try {
+    const formData = new FormData();
     const DEFAULT_NAME = 'image.png';
     const DEFAULT_DESCRIPTION = 'Dacade Gallery Image';
     formData.append("file", file, DEFAULT_NAME);
-    const response = await axios.post("https://api.nft.storage/upload", formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        "Authorization": `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6ZXRocjoweDg4NWNCNWVFMjYwYUVCNTE0Njk2ODRmMDBGMjVEMDQ4YTc4ZmNGZkMiLCJpc3MiOiJuZnQtc3RvcmFnZSIsImlhdCI6MTY5MTU3NDM1MDQ5MywibmFtZSI6ImRhY2FkZSJ9.mvb5XVsrTxTy2fTt0PaCHE2TDTYnWeQQuBvtuaXdlYU`
+
+    const response = await axios.post(
+      "https://api.nft.storage/upload",
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          "Authorization": "Bearer YOUR_ACCESS_TOKEN_HERE"
+        }
       }
-    })
+    );
+
     setButtonTxt("Uploading to CELO...");
-    contract.methods
-      .uploadImage(response.data.value.cid, description.length > 0 ? description : DEFAULT_DESCRIPTION)
-      .send({ from: account })
-      .then(async () => {
-        await updateImages();
-        setFile(null);
-        setDescription("");
-        setButtonTxt("Upload");
-        closeModal();
-      })
-      .catch(() => {
-        closeModal();
-      });
-  };
+    
+    const descriptionToUse = description.length > 0 ? description : DEFAULT_DESCRIPTION;
+    await contract.methods
+      .uploadImage(response.data.value.cid, descriptionToUse)
+      .send({ from: account });
+
+    await updateImages();
+    setFile(null);
+    setDescription("");
+    setButtonTxt("Upload");
+    closeModal();
+  } catch (error) {
+    console.error("Error during image upload:", error);
+  } finally {
+    setLoading(false); // Stop loading
+  }
+};
+
 
   return (
     <>
@@ -50,7 +72,11 @@ export const UploadImage: React.FC<Props> = ({ isOpen, closeModal }) => {
         <Dialog
           as="div"
           className="fixed inset-0 z-10 overflow-y-auto"
-          onClose={closeModal}
+          onClose={() => {
+            setFile(null);
+            setDescription("");
+            closeModal();
+          }}
         >
           <Dialog.Overlay className="fixed inset-0 bg-black opacity-40" />
 
@@ -108,26 +134,32 @@ export const UploadImage: React.FC<Props> = ({ isOpen, closeModal }) => {
                   <TextArea
                     value={description}
                     onChange={(e) => {
-                      setDescription(e.target.value);
+                      if (e.target.value.length <=  MAX_DESCRIPTION_LENGTH) {
+                        setDescription(e.target.value);
+                      }
                     }}
                     varient="ongray"
                     placeholder="Description"
-                    
+                    maxLength = {MAX_DESCRIPTION_LENGTH}
                   />
+                  <p>
+                    {description.length}/{MAX_DESCRIPTION_LENGTH} characters
+                  </p>
                 </div>
 
                 <div className="mt-4">
-                  <button
-                    type="button"
-                    disabled={buttonTxt !== "Upload"}
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-blue-900 bg-blue-100 border border-transparent rounded-md hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                    onClick={() => {
-                      if (file) uploadImage();
-                    }}
+                <button
+                  type="button"
+                  disabled={loading || !file}
+                  className="inline-flex justify-center px-4 py-2 text-sm font-medium text-blue-900 bg-blue-100 border border-transparent rounded-md hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+                  onClick={() => {
+                  if (file) uploadImage();
+                  }}
                   >
-                    {buttonTxt}
-                  </button>
-                </div>
+                  {loading ? "Uploading..." : buttonTxt}
+                </button>
+              </div>
+
               </div>
             </Transition.Child>
           </div>
