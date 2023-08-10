@@ -12,7 +12,7 @@ contract Donation {
         address payable author;
     }
 
-    mapping(uint256 => Image) public images;
+    Image[] public images;
 
     event ImageCreated(
         uint256 id,
@@ -32,22 +32,29 @@ contract Donation {
 
     // Create an Image
     function uploadImage(string memory _imgHash, string memory _description) public {
-        require(bytes(_imgHash).length > 0);
-        require(bytes(_description).length > 0);
-        require(msg.sender != address(0x0));
+        require(bytes(_imgHash).length > 0, "Image hash is required");
+        require(bytes(_description).length > 0, "Description is required");
+        require(msg.sender != address(0), "Invalid Address");
+
+        for (uint256 i = 0; i < images.length; i++) {
+            require(keccak256(bytes(images[i].hash)) != keccak256(bytes(_imgHash)), "Image hash already exists");
+        }
+
+
         imageCount++;
-        images[imageCount] = Image(
-            imageCount,
+        images.push(Image(
+            images.length,
             _imgHash,
             _description,
             0,
             payable(msg.sender)
-        );
-        emit ImageCreated(imageCount, _imgHash, _description, 0, msg.sender);
+        ));
+
+        emit ImageCreated(images.length - 1, _imgHash, _description, 0, msg.sender);
     }
 
     function donateImageOwner(uint256 _id) public payable {
-        require(_id > 0 && _id <= imageCount);
+        require(_id > 0 && _id <= imageCount, "Invalid image ID");
 
         Image memory _image = images[_id];
         address payable _author = _image.author;
